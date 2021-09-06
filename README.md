@@ -10,6 +10,8 @@ If you guess wrongly you will loose a live.
 
 With every point decrease more characers are displayed, so waiting may help you but reduces your score.
 
+My Highscore was 34 (at 5am).
+
 ## Token (Optional)
 
 The code is from GitHub (all MIT licensed) due to API limitations it is recommended to set a `Personal access token`: <https://github.com/settings/tokens>, you don't need to allow any scopes as this is only to lift the IP-Ratelimit.
