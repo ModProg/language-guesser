@@ -31,6 +31,10 @@ const LANGUAGES: &[&str] = &[
     "c#",
     "c++",
     "c",
+    "lisp",
+    "shell",
+    "vim",
+    "lua",
 ];
 
 #[derive(Deserialize, Debug)]
