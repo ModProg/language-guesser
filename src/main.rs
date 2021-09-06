@@ -109,6 +109,7 @@ async fn main() -> Result<()> {
         let mut points_total = 0;
         let mut lives = 5;
         // println!("{}", get_code().await?.code);
+        let mut failures = 0;
         'main: loop {
             if lives == 0 {
                 break;
@@ -120,6 +121,10 @@ async fn main() -> Result<()> {
             let code = if let Ok(code) = get_code(&languages).await {
                 code
             } else {
+                failures += 1;
+                if failures > 10 {
+                    break 'main;
+                }
                 continue;
             };
             let language_descriptions = languages.into_iter().zip(1..=4).collect::<Vec<_>>();
