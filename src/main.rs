@@ -143,9 +143,7 @@ async fn main() -> Result<()> {
                 terminal.draw(|f| {
                     let vertical = Layout::default()
                         .direction(Direction::Vertical)
-                        .constraints(
-                            [Constraint::Percentage(10), Constraint::Percentage(80)].as_ref(),
-                        )
+                        .constraints([Constraint::Length(6), Constraint::Percentage(80)].as_ref())
                         .split(f.size());
                     let block = Block::default().borders(Borders::ALL);
                     {
@@ -168,11 +166,9 @@ async fn main() -> Result<()> {
                             .direction(Direction::Horizontal)
                             .constraints(
                                 [
-                                    Constraint::Ratio(1, 5),
-                                    Constraint::Ratio(1, 5),
-                                    Constraint::Ratio(1, 5),
-                                    Constraint::Ratio(1, 5),
-                                    Constraint::Ratio(1, 5),
+                                    Constraint::Ratio(1, 3),
+                                    Constraint::Ratio(1, 3),
+                                    Constraint::Ratio(1, 3),
                                 ]
                                 .as_ref(),
                             )
@@ -190,7 +186,7 @@ async fn main() -> Result<()> {
 
                     let horizontal = Layout::default()
                         .direction(Direction::Horizontal)
-                        .constraints([Constraint::Min(0), Constraint::Length(20)])
+                        .constraints([Constraint::Length(20), Constraint::Min(0)])
                         .split(vertical[1]);
                     let shown_chars = if points_round == 0 {
                         code.code.len() as i32
@@ -211,14 +207,14 @@ async fn main() -> Result<()> {
                     .wrap(Wrap { trim: false })
                     .block(Block::default().title("Code").borders(Borders::ALL));
 
-                    f.render_widget(code, horizontal[0]);
+                    f.render_widget(code, horizontal[1]);
                     let table =
                         Table::new(language_descriptions.iter().map(|(language, number)| {
                             Row::new(vec![number.to_string(), language.to_string()])
                         }))
                         .widths(&[Constraint::Length(3), Constraint::Percentage(100)])
                         .block(Block::default().title("Languages").borders(Borders::ALL));
-                    f.render_widget(table, horizontal[1]);
+                    f.render_widget(table, horizontal[0]);
                 })?;
 
                 if let Event::Input(input) = events.next()? {
@@ -263,6 +259,6 @@ async fn main() -> Result<()> {
         points_total
     };
 
-    println!("Your total points {}!", points);
+    println!("\n\nYour total points {}!\n\n", points);
     Ok(())
 }
