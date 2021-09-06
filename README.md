@@ -16,7 +16,7 @@ The code is from GitHub (all MIT licensed) due to API limitations it is recommen
 
 If you have a PAT you can provide it via the environment variable `LANGUAGE_GUESSER_TOKEN`.
 
-Don't worry you can play without that, but bear in mind that you will only be play 60 "files" per hour as that is the GitHub rate limit.
+Don't worry you can play without that, but bear in mind that you will only be able to play 60 "files" per hour as that is the GitHub rate limit.
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────┐
