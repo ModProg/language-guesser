@@ -1,90 +1,35 @@
+use anyhow::Result;
+use async_trait::async_trait;
+use events::Events;
+use octocrab::models::Repository;
+use rand::prelude::*;
 use std::io;
 use std::time::{Duration, Instant};
 use termion::event::Key;
 use termion::raw::IntoRawMode;
 use termion::screen::AlternateScreen;
 use tui::backend::TermionBackend;
-use tui::Terminal;
-
-use anyhow::{anyhow, Result};
-use events::Events;
-use rand::prelude::*;
-use serde::Deserialize;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::widgets::{Block, Borders, Paragraph, Row, Table, Wrap};
+use tui::Terminal;
+
+use crate::github::GitHub;
 
 use self::events::Event;
 mod events;
-
-const LANGUAGES: &[&str] = &[
-    "rust",
-    "javascript",
-    "typescript",
-    "go",
-    "java",
-    "kotlin",
-    "dart",
-    "html",
-    "ruby",
-    "php",
-    "css",
-    "c#",
-    "c++",
-    "c",
-    "lisp",
-    "shell",
-    "vim",
-    "lua",
-];
-
-#[derive(Deserialize, Debug)]
-struct CodeRequest {
-    download_url: String,
-}
+mod github;
 
 #[derive(Debug)]
 struct Code {
-    repository: octocrab::models::Repository,
+    repository: Repository,
     code: String,
     language: usize,
+    options: Vec<String>,
 }
 
-async fn get_code(languages: &Vec<String>) -> Result<Code> {
-    let rng = &mut rand::thread_rng();
-    let octocrab = octocrab::instance();
-    let idx = rng.gen_range(0..languages.len());
-    let language = &languages[idx];
-
-    let repos = octocrab
-        .search()
-        .repositories(&format!("language:{} license:mit stars:>=30", language))
-        .sort("updated")
-        .send()
-        .await?
-        .items;
-
-    let repo = repos.choose(rng).ok_or_else(|| anyhow!(""))?;
-
-    let files = octocrab
-        .search()
-        .code(&format!("language:{} repo:{}", language, repo.full_name))
-        .send()
-        .await?
-        .items;
-
-    let file = files.choose(rng).ok_or_else(|| anyhow!(""))?;
-
-    let code: CodeRequest = octocrab.get(&file.url, None::<&()>).await?;
-    let code: String = octocrab
-        ._get(code.download_url, None::<&()>)
-        .await?
-        .text()
-        .await?;
-    Ok(Code {
-        repository: repo.clone(),
-        code,
-        language: idx,
-    })
+#[async_trait]
+trait CodeProvider {
+    async fn get_code(&self) -> Result<Code>;
 }
 
 const MAX_POINTS: i32 = 12;
@@ -95,10 +40,11 @@ fn shown_chars(points: i32) -> i32 {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    if let Ok(token) = std::env::var("LANGUAGE_GUESSER_TOKEN") {
-        // Set account and pw
-        octocrab::initialise(octocrab::Octocrab::builder().personal_token(token))?;
-    }
+    let code_provider: &dyn CodeProvider = &if true {
+        GitHub::default().token(std::env::var("LANGUAGE_GUESSER_TOKEN").ok())?
+    } else {
+        todo!()
+    };
 
     // Create Terminal
     let points = {
@@ -118,11 +64,7 @@ async fn main() -> Result<()> {
             if lives == 0 {
                 break;
             }
-            let languages: Vec<String> = LANGUAGES
-                .choose_multiple(rng, 4)
-                .map(|f| f.to_string())
-                .collect();
-            let code = if let Ok(code) = get_code(&languages).await {
+            let code = if let Ok(code) = code_provider.get_code().await {
                 code
             } else {
                 failures += 1;
@@ -131,9 +73,10 @@ async fn main() -> Result<()> {
                 }
                 continue;
             };
-            let language_descriptions = languages.into_iter().zip(1..=4).collect::<Vec<_>>();
+            let language_descriptions = code.options.into_iter().zip(1..).collect::<Vec<_>>();
             let mut points_round = MAX_POINTS;
             let origin = rng.gen_range(0..code.code.len()) as i32;
+            let text = code.code;
             let mut last = Instant::now();
             loop {
                 if Instant::now().duration_since(last) > STEP_DURATION {
@@ -198,16 +141,15 @@ async fn main() -> Result<()> {
                         .constraints([Constraint::Length(20), Constraint::Min(0)])
                         .split(vertical[1]);
                     let shown_chars = if points_round == 0 {
-                        code.code.len() as i32
+                        text.len() as i32
                     } else {
                         shown_chars(points_round)
                     };
-                    let start = (code.code.len() as i32 - shown_chars)
+                    let start = (text.len() as i32 - shown_chars)
                         .min(origin as i32 - shown_chars / 2)
                         .max(0);
                     let code = Paragraph::new(
-                        code.code
-                            .as_str()
+                        text.as_str()
                             .chars()
                             .skip(start as usize)
                             .take(shown_chars as usize)
