@@ -1,10 +1,14 @@
+#![feature(try_blocks)]
 use anyhow::Result;
 use async_trait::async_trait;
+use clap::ArgEnum;
+use clap::Clap;
 use events::Events;
-use octocrab::models::Repository;
 use rand::prelude::*;
-use std::io;
+use std::num::NonZeroU8;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+use std::{env, io};
 use termion::event::Key;
 use termion::raw::IntoRawMode;
 use termion::screen::AlternateScreen;
@@ -13,23 +17,27 @@ use tui::layout::{Constraint, Direction, Layout};
 use tui::widgets::{Block, Borders, Paragraph, Row, Table, Wrap};
 use tui::Terminal;
 
-use crate::github::GitHub;
+use crate::providers::github::GitHub;
+use crate::providers::TestProvider;
 
 use self::events::Event;
 mod events;
-mod github;
+mod providers;
 
 #[derive(Debug)]
 struct Code {
-    repository: Repository,
+    reference: String,
     code: String,
     language: usize,
     options: Vec<String>,
 }
 
 #[async_trait]
-trait CodeProvider {
+trait CodeProvider: Send + Sync {
     async fn get_code(&self) -> Result<Code>;
+
+    fn retries(&mut self, count: u8);
+    fn options(&mut self, count: u8);
 }
 
 const MAX_POINTS: i32 = 12;
@@ -38,13 +46,46 @@ fn shown_chars(points: i32) -> i32 {
     2i32.pow((MAX_POINTS - points).max(0) as u32)
 }
 
+#[derive(ArgEnum)]
+#[clap(rename_all = "pascal_case")]
+enum CodeProviders {
+    GitHub,
+    // FIXME this is currently not working https://github.com/clap-rs/clap/issues/2756
+    #[clap(hidden(true))]
+    Test,
+}
+
+#[derive(Clap)]
+struct Options {
+    /// How many options should be displayed when guessing the language
+    #[clap(long, short, default_value = "4")]
+    options: NonZeroU8,
+    /// How often should webrequests be repeted on failure, only relevant for GitHub code
+    /// provider
+    #[clap(long, short, default_value = "8")]
+    retries: NonZeroU8,
+    /// What provider should be used for the code displayed
+    ///
+    /// * GitHub: pulls Code from a random repository licensed under MIT
+    ///
+    /// * BuiltIn: will use the code provided in ``
+    #[clap(long, short, default_value = "Github", arg_enum, case_insensitive(true))]
+    provider: CodeProviders,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    let code_provider: &dyn CodeProvider = &if true {
-        GitHub::default().token(std::env::var("LANGUAGE_GUESSER_TOKEN").ok())?
-    } else {
-        todo!()
+    let options = Options::parse();
+
+    let mut code_provider: Box<dyn CodeProvider> = match options.provider {
+        CodeProviders::GitHub => {
+            Box::new(GitHub::default().token(env::var("LANGUAGE_GUESSER_TOKEN").ok())?)
+        }
+        CodeProviders::Test => Box::new(TestProvider::default()),
     };
+    code_provider.retries(options.retries.into());
+    code_provider.options(options.options.into());
+    let code_provider = Arc::new(code_provider);
 
     // Create Terminal
     let points = {
@@ -58,34 +99,28 @@ async fn main() -> Result<()> {
 
         let mut points_total = 0;
         let mut lives = 5;
-        // println!("{}", get_code().await?.code);
-        let mut failures = 0;
+        let c = code_provider.clone();
+        let mut next = Box::pin(tokio::spawn(async move { c.get_code().await }));
         'main: loop {
             if lives == 0 {
-                break;
+                break 'main;
             }
-            let code = if let Ok(code) = code_provider.get_code().await {
-                code
-            } else {
-                failures += 1;
-                if failures > 10 {
-                    break 'main;
-                }
-                continue;
-            };
+            let code = next.await??;
+            let c = code_provider.clone();
+            next = Box::pin(tokio::spawn(async move { c.get_code().await }));
             let language_descriptions = code.options.into_iter().zip(1..).collect::<Vec<_>>();
             let mut points_round = MAX_POINTS;
             let origin = rng.gen_range(0..code.code.len()) as i32;
             let text = code.code;
             let mut last = Instant::now();
-            loop {
+            'tick: loop {
                 if Instant::now().duration_since(last) > STEP_DURATION {
                     if points_round == 0 {
                         lives -= 1;
                         if lives == 0 {
                             break 'main;
                         } else {
-                            break;
+                            break 'tick;
                         }
                     } else {
                         points_round -= 1;
@@ -178,7 +213,7 @@ async fn main() -> Result<()> {
                         } else {
                             lives -= 1;
                         }
-                        break;
+                        break 'tick;
                     }
                     if let Key::Char('2') = input {
                         if code.language == 1 {
@@ -186,7 +221,7 @@ async fn main() -> Result<()> {
                         } else {
                             lives -= 1;
                         }
-                        break;
+                        break 'tick;
                     }
                     if let Key::Char('3') = input {
                         if code.language == 2 {
@@ -194,7 +229,7 @@ async fn main() -> Result<()> {
                         } else {
                             lives -= 1;
                         }
-                        break;
+                        break 'tick;
                     }
                     if let Key::Char('4') = input {
                         if code.language == 3 {
@@ -202,7 +237,7 @@ async fn main() -> Result<()> {
                         } else {
                             lives -= 1;
                         }
-                        break;
+                        break 'tick;
                     }
                 }
             }
