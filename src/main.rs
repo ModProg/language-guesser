@@ -1,17 +1,24 @@
-#![feature(try_blocks)]
+#![feature(try_blocks, duration_constants)]
 use anyhow::Result;
 use async_trait::async_trait;
 use clap::ArgEnum;
 use clap::Clap;
-use events::Events;
+use crossterm::event::KeyEvent;
+use crossterm::event::KeyModifiers;
 use rand::prelude::*;
 use std::num::NonZeroU8;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{env, io};
-use termion::event::Key;
-use termion::raw::IntoRawMode;
-use termion::screen::AlternateScreen;
+// use termion::event::Key;
+// use termion::raw::IntoRawMode;
+// use termion::screen::AlternateScreen;
+use crossterm::{
+    event::{self, Event, KeyCode as Key},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use tui::backend::CrosstermBackend;
 use tui::backend::TermionBackend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::widgets::{Block, Borders, Paragraph, Row, Table, Wrap};
@@ -20,8 +27,6 @@ use tui::Terminal;
 use crate::providers::github::GitHub;
 use crate::providers::TestProvider;
 
-use self::events::Event;
-mod events;
 mod providers;
 
 #[derive(Debug)]
@@ -69,7 +74,13 @@ struct Options {
     /// * GitHub: pulls Code from a random repository licensed under MIT
     ///
     /// * BuiltIn: will use the code provided in ``
-    #[clap(long, short, default_value = "Github", arg_enum, case_insensitive(true))]
+    #[clap(
+        long,
+        short,
+        default_value = "Github",
+        arg_enum,
+        case_insensitive(true)
+    )]
     provider: CodeProviders,
 }
 
@@ -89,11 +100,12 @@ async fn main() -> Result<()> {
 
     // Create Terminal
     let points = {
-        let stdout = io::stdout().into_raw_mode()?;
-        let stdout = AlternateScreen::from(stdout);
-        let backend = TermionBackend::new(stdout);
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen)?;
+        let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
-        let events = Events::new();
+        terminal.clear()?;
 
         let rng = &mut rand::thread_rng();
 
@@ -203,45 +215,52 @@ async fn main() -> Result<()> {
                     f.render_widget(table, horizontal[0]);
                 })?;
 
-                if let Event::Input(input) = events.next()? {
-                    if let Key::Ctrl('c') = input {
-                        break 'main;
-                    }
-                    if let Key::Char('1') = input {
-                        if code.language == 0 {
-                            points_total += points_round;
-                        } else {
-                            lives -= 1;
+                if event::poll(Duration::ZERO)? {
+                    if let Event::Key(KeyEvent {
+                        code: key,
+                        modifiers,
+                    }) = event::read()?
+                    {
+                        if let (Key::Char('c'), KeyModifiers::CONTROL) = (key, modifiers) {
+                            break 'main;
                         }
-                        break 'tick;
-                    }
-                    if let Key::Char('2') = input {
-                        if code.language == 1 {
-                            points_total += points_round;
-                        } else {
-                            lives -= 1;
+                        if let Key::Char('1') = key {
+                            if code.language == 0 {
+                                points_total += points_round;
+                            } else {
+                                lives -= 1;
+                            }
+                            break 'tick;
                         }
-                        break 'tick;
-                    }
-                    if let Key::Char('3') = input {
-                        if code.language == 2 {
-                            points_total += points_round;
-                        } else {
-                            lives -= 1;
+                        if let Key::Char('2') = key {
+                            if code.language == 1 {
+                                points_total += points_round;
+                            } else {
+                                lives -= 1;
+                            }
+                            break 'tick;
                         }
-                        break 'tick;
-                    }
-                    if let Key::Char('4') = input {
-                        if code.language == 3 {
-                            points_total += points_round;
-                        } else {
-                            lives -= 1;
+                        if let Key::Char('3') = key {
+                            if code.language == 2 {
+                                points_total += points_round;
+                            } else {
+                                lives -= 1;
+                            }
+                            break 'tick;
                         }
-                        break 'tick;
+                        if let Key::Char('4') = key {
+                            if code.language == 3 {
+                                points_total += points_round;
+                            } else {
+                                lives -= 1;
+                            }
+                            break 'tick;
+                        }
                     }
                 }
             }
         }
+        execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
         points_total
     };
 
