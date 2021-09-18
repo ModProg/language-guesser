@@ -10,16 +10,12 @@ use std::num::NonZeroU8;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{env, io};
-// use termion::event::Key;
-// use termion::raw::IntoRawMode;
-// use termion::screen::AlternateScreen;
 use crossterm::{
     event::{self, Event, KeyCode as Key},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use tui::backend::CrosstermBackend;
-use tui::backend::TermionBackend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::widgets::{Block, Borders, Paragraph, Row, Table, Wrap};
 use tui::Terminal;
@@ -52,10 +48,9 @@ fn shown_chars(points: i32) -> i32 {
 }
 
 #[derive(ArgEnum)]
-#[clap(rename_all = "pascal_case")]
 enum CodeProviders {
+    #[clap(name = "github")]
     GitHub,
-    // FIXME this is currently not working https://github.com/clap-rs/clap/issues/2756
     #[clap(hidden(true))]
     Test,
 }
