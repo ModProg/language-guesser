@@ -5,16 +5,16 @@ use clap::ArgEnum;
 use clap::Clap;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyModifiers;
-use rand::prelude::*;
-use std::num::NonZeroU8;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-use std::{env, io};
 use crossterm::{
     event::{self, Event, KeyCode as Key},
     execute,
     terminal::{enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use rand::prelude::*;
+use std::num::NonZeroU8;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use std::{env, io};
 use tui::backend::CrosstermBackend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::widgets::{Block, Borders, Paragraph, Row, Table, Wrap};
@@ -72,7 +72,7 @@ struct Options {
     #[clap(
         long,
         short,
-        default_value = "Github",
+        default_value = "GitHub",
         arg_enum,
         case_insensitive(true)
     )]
@@ -117,7 +117,12 @@ async fn main() -> Result<()> {
             next = Box::pin(tokio::spawn(async move { c.get_code().await }));
             let language_descriptions = code.options.into_iter().zip(1..).collect::<Vec<_>>();
             let mut points_round = MAX_POINTS;
-            let origin = rng.gen_range(0..code.code.len()) as i32;
+            let origin = loop {
+                let origin = rng.gen_range(0..code.code.len());
+                if !code.code.chars().nth(origin).unwrap().is_whitespace() {
+                    break origin as i32;
+                };
+            };
             let text = code.code;
             let mut last = Instant::now();
             'tick: loop {
