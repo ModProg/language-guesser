@@ -8,7 +8,7 @@ use crossterm::event::KeyModifiers;
 use crossterm::{
     event::{self, Event, KeyCode as Key},
     execute,
-    terminal::{enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use rand::prelude::*;
 use std::num::NonZeroU8;
@@ -58,6 +58,7 @@ enum CodeProviders {
 #[derive(Clap)]
 struct Options {
     /// How many options should be displayed when guessing the language
+    /// This should be at least 2 and at most 10
     #[clap(long, short, default_value = "4")]
     options: NonZeroU8,
     /// How often should webrequests be repeted on failure, only relevant for GitHub code
@@ -94,7 +95,7 @@ async fn main() -> Result<()> {
     let code_provider = Arc::new(code_provider);
 
     // Create Terminal
-    let points = {
+    let (points, codes) = {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
         execute!(stdout, EnterAlternateScreen)?;
@@ -105,6 +106,7 @@ async fn main() -> Result<()> {
         let rng = &mut rand::thread_rng();
 
         let mut points_total = 0;
+        let mut codes: Vec<(Code, Option<i32>)> = Vec::new();
         let mut lives = 5;
         let c = code_provider.clone();
         let mut next = Box::pin(tokio::spawn(async move { c.get_code().await }));
@@ -115,7 +117,12 @@ async fn main() -> Result<()> {
             let code = next.await??;
             let c = code_provider.clone();
             next = Box::pin(tokio::spawn(async move { c.get_code().await }));
-            let language_descriptions = code.options.into_iter().zip(1..).collect::<Vec<_>>();
+            let language_descriptions = code
+                .options
+                .clone()
+                .into_iter()
+                .zip(1..)
+                .collect::<Vec<_>>();
             let mut points_round = MAX_POINTS;
             let origin = loop {
                 let origin = rng.gen_range(0..code.code.len());
@@ -123,7 +130,7 @@ async fn main() -> Result<()> {
                     break origin as i32;
                 };
             };
-            let text = code.code;
+            let text = code.code.clone();
             let mut last = Instant::now();
             'tick: loop {
                 if Instant::now().duration_since(last) > STEP_DURATION {
@@ -224,35 +231,13 @@ async fn main() -> Result<()> {
                         if let (Key::Char('c'), KeyModifiers::CONTROL) = (key, modifiers) {
                             break 'main;
                         }
-                        if let Key::Char('1') = key {
-                            if code.language == 0 {
+                        if let Key::Char(char) = key {
+                            if char as usize - '1' as usize == code.language {
                                 points_total += points_round;
+                                codes.push((code, Some(points_round)));
                             } else {
                                 lives -= 1;
-                            }
-                            break 'tick;
-                        }
-                        if let Key::Char('2') = key {
-                            if code.language == 1 {
-                                points_total += points_round;
-                            } else {
-                                lives -= 1;
-                            }
-                            break 'tick;
-                        }
-                        if let Key::Char('3') = key {
-                            if code.language == 2 {
-                                points_total += points_round;
-                            } else {
-                                lives -= 1;
-                            }
-                            break 'tick;
-                        }
-                        if let Key::Char('4') = key {
-                            if code.language == 3 {
-                                points_total += points_round;
-                            } else {
-                                lives -= 1;
+                                codes.push((code, None));
                             }
                             break 'tick;
                         }
@@ -261,9 +246,33 @@ async fn main() -> Result<()> {
             }
         }
         execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
-        points_total
+        disable_raw_mode()?;
+        (points_total, codes)
     };
 
-    println!("\n\nYour total points {}!\n\n", points);
+    println!("\nYour total points {}!\n\nDetails:", points);
+    {
+        use comfy_table::modifiers::UTF8_SOLID_INNER_BORDERS;
+        use comfy_table::presets::UTF8_FULL;
+        use comfy_table::{Cell, CellAlignment, ContentArrangement, Table};
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL)
+            .apply_modifier(UTF8_SOLID_INNER_BORDERS)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(
+                vec!["Score", "Language", "Reference"]
+                    .iter()
+                    .map(|s| Cell::new(s).set_alignment(CellAlignment::Center)),
+            );
+        for (code, points) in codes {
+            table.add_row(vec![
+                Cell::new(points.map(|x|x.to_string()).unwrap_or_else(|| String::from("---"))),
+                Cell::new(code.options[code.language].clone()),
+                Cell::new(code.reference),
+            ]);
+        }
+        println!("{}", table);
+    }
     Ok(())
 }
