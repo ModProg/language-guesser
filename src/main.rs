@@ -185,7 +185,7 @@ async fn main() -> Result<()> {
                         let p = Paragraph::new(format!("Round Points: {}", points_round));
                         f.render_widget(p, bottom[1]);
 
-                        let p = Paragraph::new(format!("Lives: {}", "❦ ".repeat(lives)));
+                        let p = Paragraph::new(format!("Lives: {}", "🫀".repeat(lives)));
                         f.render_widget(p, bottom[2]);
                     }
                     f.render_widget(block, vertical[0]);
@@ -232,14 +232,16 @@ async fn main() -> Result<()> {
                             break 'main;
                         }
                         if let Key::Char(char) = key {
-                            if char as usize - '1' as usize == code.language {
-                                points_total += points_round;
-                                codes.push((code, Some(points_round)));
-                            } else {
-                                lives -= 1;
-                                codes.push((code, None));
+                            if char >= '1' && char <= '9' {
+                                if char as usize - '1' as usize == code.language {
+                                    points_total += points_round;
+                                    codes.push((code, Some(points_round)));
+                                } else {
+                                    lives -= 1;
+                                    codes.push((code, None));
+                                }
+                                break 'tick;
                             }
-                            break 'tick;
                         }
                     }
                 }
@@ -267,7 +269,11 @@ async fn main() -> Result<()> {
             );
         for (code, points) in codes {
             table.add_row(vec![
-                Cell::new(points.map(|x|x.to_string()).unwrap_or_else(|| String::from("---"))),
+                Cell::new(
+                    points
+                        .map(|x| x.to_string())
+                        .unwrap_or_else(|| String::from("---")),
+                ),
                 Cell::new(code.options[code.language].clone()),
                 Cell::new(code.reference),
             ]);
