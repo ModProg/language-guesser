@@ -100,7 +100,7 @@ impl CodeProvider for GitHub {
                     .text()
                     .await?;
                 return Ok(Code {
-                    reference: repo.full_name.clone(),
+                    reference: file.html_url.to_string(),
                     code: code.max(" ".to_string()),
                     language: idx,
                     options: languages,
