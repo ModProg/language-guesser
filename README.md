@@ -1,5 +1,7 @@
 # LanguageGuesser
 
+**Winner of the [Terminal Jam](https://togglebit.io/posts/terminal-game-jam/) by [Togglebit](twitch.tv/togglebit).**
+
 The goal is simple: **Guess the programming language shown**.
 
 You are given 5 lives and loose one every time you cannot guess the language quickly enough.
