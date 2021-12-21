@@ -24,6 +24,7 @@ use crate::providers::github::GitHub;
 use crate::providers::TestProvider;
 
 mod providers;
+mod util;
 
 #[derive(Debug)]
 struct Code {
@@ -85,9 +86,11 @@ async fn main() -> Result<()> {
     let options = Options::parse();
 
     let mut code_provider: Box<dyn CodeProvider> = match options.provider {
-        CodeProviders::GitHub => {
-            Box::new(GitHub::default().token(env::var("LANGUAGE_GUESSER_TOKEN").ok())?)
-        }
+        CodeProviders::GitHub => Box::new(
+            GitHub::new()
+                .await?
+                .token(env::var("LANGUAGE_GUESSER_TOKEN").ok())?,
+        ),
         CodeProviders::Test => Box::new(TestProvider::default()),
     };
     code_provider.retries(options.retries.into());

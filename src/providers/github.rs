@@ -1,52 +1,42 @@
-use crate::{Code, CodeProvider};
+use crate::{util::DeserializeKeys, Code, CodeProvider};
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use octocrab::Octocrab;
 use rand::{prelude::*, thread_rng};
 use serde::Deserialize;
 
-const LANGUAGES: &[&str] = &[
-    "rust",
-    "javascript",
-    "typescript",
-    "go",
-    "java",
-    "kotlin",
-    "dart",
-    "html",
-    "ruby",
-    "php",
-    "css",
-    "c#",
-    "c++",
-    "c",
-    "lisp",
-    "shell",
-    "vim",
-    "lua",
-];
-
 #[derive(Deserialize, Debug)]
 struct CodeRequest {
     download_url: String,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct GitHub {
     language_count: usize,
     retries: u8,
-}
-
-impl Default for GitHub {
-    fn default() -> Self {
-        GitHub {
-            language_count: 4,
-            retries: 8,
-        }
-    }
+    languages: Vec<String>,
 }
 
 impl GitHub {
+    pub async fn new() -> Result<Self> {
+        let res = octocrab::instance()
+            ._get(
+                "https://raw.githubusercontent.com/github/linguist/master/lib/linguist/languages.yml",
+                None::<&()>,
+            )
+            .await?
+            .bytes()
+            .await?;
+
+        let DeserializeKeys(languages) = serde_yaml::from_slice(&res)?;
+
+        Ok(GitHub {
+            language_count: 4,
+            retries: 8,
+            languages,
+        })
+    }
+
     pub fn token(self, token: Option<String>) -> Result<Self> {
         if let Some(token) = token {
             octocrab::initialise(Octocrab::builder().personal_token(token))?;
@@ -67,7 +57,8 @@ impl CodeProvider for GitHub {
         let octocrab = octocrab::instance();
         for _ in 0..self.retries {
             let _: Result<()> = try {
-                let languages: Vec<String> = LANGUAGES
+                let languages: Vec<String> = self
+                    .languages
                     .choose_multiple(&mut thread_rng(), self.language_count)
                     .map(|s| s.to_string())
                     .collect();
