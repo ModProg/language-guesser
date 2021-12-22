@@ -1,5 +1,5 @@
 #![feature(try_blocks, duration_constants)]
-use anyhow::Result;
+use anyhow::{bail, Result};
 use async_trait::async_trait;
 use clap::ArgEnum;
 use clap::Clap;
@@ -24,6 +24,7 @@ use crate::providers::github::GitHub;
 use crate::providers::TestProvider;
 
 mod providers;
+mod util;
 
 #[derive(Debug)]
 struct Code {
@@ -78,16 +79,25 @@ struct Options {
         case_insensitive(true)
     )]
     provider: CodeProviders,
+    /// An optional list of language to use. If omitted, all languages on github will be used.
+    #[clap(long, short)]
+    languages: Vec<String>,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let options = Options::parse();
 
+    if !options.languages.is_empty() && options.languages.len() < options.options.get() as usize {
+        bail!("Not enough languages! Need at least {}", options.options);
+    }
+
     let mut code_provider: Box<dyn CodeProvider> = match options.provider {
-        CodeProviders::GitHub => {
-            Box::new(GitHub::default().token(env::var("LANGUAGE_GUESSER_TOKEN").ok())?)
-        }
+        CodeProviders::GitHub => Box::new(
+            GitHub::new(options.languages)
+                .await?
+                .token(env::var("LANGUAGE_GUESSER_TOKEN").ok())?,
+        ),
         CodeProviders::Test => Box::new(TestProvider::default()),
     };
     code_provider.retries(options.retries.into());
