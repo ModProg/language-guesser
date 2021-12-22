@@ -18,17 +18,21 @@ pub struct GitHub {
 }
 
 impl GitHub {
-    pub async fn new() -> Result<Self> {
-        let res = octocrab::instance()
-            ._get(
-                "https://raw.githubusercontent.com/github/linguist/master/lib/linguist/languages.yml",
-                None::<&()>,
-            )
-            .await?
-            .bytes()
-            .await?;
+    pub async fn new(mut languages: Vec<String>) -> Result<Self> {
+        if languages.is_empty() {
+            let res = octocrab::instance()
+                ._get(
+                    "https://raw.githubusercontent.com/github/linguist/master/lib/linguist/languages.yml",
+                    None::<&()>,
+                )
+                .await?
+                .bytes()
+                .await?;
 
-        let DeserializeKeys(languages) = serde_yaml::from_slice(&res)?;
+            let DeserializeKeys(langs) = serde_yaml::from_slice(&res)?;
+
+            languages = langs;
+        }
 
         Ok(GitHub {
             language_count: 4,
