@@ -34,9 +34,9 @@ impl<'de> Deserialize<'de> for DeserializeKeys {
     }
 }
 
-// A type that can be deserialized from any data but doesn't save it.
-// Useful for where something needs to be deserialized to correctly drive a deserializer but isn't
-// needed.
+/// A type that can be deserialized from any data but doesn't save it.
+/// Useful for where something needs to be deserialized to correctly drive a deserializer but isn't
+/// needed.
 pub struct VoidDeserialize;
 
 impl<'de> Deserialize<'de> for VoidDeserialize {
