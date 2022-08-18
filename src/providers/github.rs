@@ -49,6 +49,15 @@ impl GitHub {
     }
 }
 
+macro_rules! continue_on_error {
+    ($($tts:tt)*) => {
+        match $($tts)* {
+            Ok(v) => v,
+            _ => continue,
+        }
+    };
+}
+
 #[async_trait]
 impl CodeProvider for GitHub {
     async fn get_code(&self) -> Result<Code> {
@@ -60,47 +69,55 @@ impl CodeProvider for GitHub {
         // });
         let octocrab = octocrab::instance();
         for _ in 0..self.retries {
-            let _: Result<()> = try {
-                let languages: Vec<String> = self
-                    .languages
-                    .choose_multiple(&mut thread_rng(), self.language_count)
-                    .map(|s| s.to_string())
-                    .collect();
-                let idx = thread_rng().gen_range(0..languages.len());
-                let language = &languages[idx];
+            let languages: Vec<String> = self
+                .languages
+                .choose_multiple(&mut thread_rng(), self.language_count)
+                .map(|s| s.to_string())
+                .collect();
+            let idx = thread_rng().gen_range(0..languages.len());
+            let language = &languages[idx];
 
-                let repos = octocrab
+            let repos = continue_on_error!(
+                octocrab
                     .search()
                     .repositories(&format!("language:{} license:mit stars:>=30", language))
                     .sort("updated")
                     .send()
-                    .await?
-                    .items;
+                    .await
+            )
+            .items;
 
-                let repo = repos.choose(&mut thread_rng()).ok_or_else(|| anyhow!(""))?;
+            let repo =
+                continue_on_error!(repos.choose(&mut thread_rng()).ok_or_else(|| anyhow!("")));
 
-                let files = octocrab
+            let files = continue_on_error!(
+                octocrab
                     .search()
-                    .code(&format!("language:{} repo:{}", language, repo.full_name))
+                    .code(&format!(
+                        "language:{} repo:{}",
+                        language,
+                        repo.full_name.as_deref().unwrap_or_default()
+                    ))
                     .send()
-                    .await?
-                    .items;
+                    .await
+            )
+            .items;
 
-                let file = files.choose(&mut thread_rng()).ok_or_else(|| anyhow!(""))?;
+            let file =
+                continue_on_error!(files.choose(&mut thread_rng()).ok_or_else(|| anyhow!("")));
 
-                let code: CodeRequest = octocrab.get(&file.url, None::<&()>).await?;
-                let code: String = octocrab
-                    ._get(code.download_url, None::<&()>)
-                    .await?
+            let code: CodeRequest = continue_on_error!(octocrab.get(&file.url, None::<&()>).await);
+            let code: String = continue_on_error!(
+                continue_on_error!(octocrab._get(code.download_url, None::<&()>).await)
                     .text()
-                    .await?;
-                return Ok(Code {
-                    reference: file.html_url.to_string(),
-                    code: code.max(" ".to_string()),
-                    language: idx,
-                    options: languages,
-                });
-            };
+                    .await
+            );
+            return Ok(Code {
+                reference: file.html_url.to_string(),
+                code: code.max(" ".to_string()),
+                language: idx,
+                options: languages,
+            });
         }
         bail!("Unable to get new code from GitHub.");
     }

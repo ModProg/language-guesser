@@ -1,0 +1,27 @@
+vstack:
+    border:
+        vstack:
+            text: "Press 'q' if you want to give up"
+            hstack [padding-bottom: 1]:
+                text: "Press 1-{{ max_language }} to guess a language"
+            expand [direction: horz]:
+                hstack:
+                    expand [direction: horz]:
+                        text: "Total Points: {{ total_points }}"
+                    expand [direction: horz]:
+                        text: "Round Points: {{ round_points }}"
+                    expand [direction: horz]:
+                        text: "Lives: {{ lives }}"
+                            span [foreground: red]: "♥"
+    hstack:
+        border [width: 20]:
+            expand:
+                vstack:
+                    for [data: {{ languages }}, binding: language]:
+                        hstack [id: "vstack-{{ language.0 }}"]:
+                            vstack [width: 3, id: "a1-{{ language.0 }}"]:
+                                text [id: "a2-{{ language.0 }}"]: "{{ language.0 }}"
+                            text [id: "b-{{ language.0 }}"]: "{{ language.1 }}"
+        border:
+            expand:
+                text: "{{ code }}"

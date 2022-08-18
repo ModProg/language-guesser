@@ -1,5 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use rand::distributions::Alphanumeric;
 
 use crate::{Code, CodeProvider};
 
@@ -13,6 +14,7 @@ pub struct TestProvider {
 #[async_trait]
 impl CodeProvider for TestProvider {
     async fn get_code(&self) -> Result<Code> {
+        // let c: char = Alphanumeric;
         Ok(Code {
             reference: "test".into(),
             code: "ABC".into(),
