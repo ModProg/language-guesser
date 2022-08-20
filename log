@@ -1,0 +1,114 @@
+warning: unused import: `anathema::display::disable_raw_mode`
+ --> src/main.rs:1:5
+  |
+1 | use anathema::display::disable_raw_mode;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `crossterm::execute`
+  --> src/main.rs:10:5
+   |
+10 | use crossterm::execute;
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::io::stdout`
+  --> src/main.rs:15:5
+   |
+15 | use std::io::stdout;
+   |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::atomic::AtomicBool`
+  --> src/main.rs:17:5
+   |
+17 | use std::sync::atomic::AtomicBool;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::atomic::Ordering::Relaxed`
+  --> src/main.rs:18:5
+   |
+18 | use std::sync::atomic::Ordering::Relaxed;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Instant`
+  --> src/main.rs:21:27
+   |
+21 | use std::time::{Duration, Instant};
+   |                           ^^^^^^^
+
+warning: unused import: `io`
+  --> src/main.rs:22:16
+   |
+22 | use std::{env, io};
+   |                ^^
+
+warning: unused import: `rand::prelude`
+  --> src/main.rs:13:5
+   |
+13 | use rand::prelude::*;
+   |     ^^^^^^^^^^^^^
+
+warning: unused variable: `lives`
+   --> src/main.rs:321:13
+    |
+321 |     let mut lives = 5;
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_lives`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: variable does not need to be mutable
+   --> src/main.rs:283:9
+    |
+283 |     let mut runtime = Runtime::<UserEvent>::new();
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+   --> src/main.rs:318:9
+    |
+318 |     let mut points_round = MAX_POINTS;
+    |         ----^^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/main.rs:321:9
+    |
+321 |     let mut lives = 5;
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: function `shown_chars` is never used
+  --> src/main.rs:49:4
+   |
+49 | fn shown_chars(points: i64) -> usize {
+   |    ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: variant `Lives` is never constructed
+  --> src/main.rs:93:5
+   |
+89 | enum UserEvent {
+   |      --------- variant in this enum
+...
+93 |     Lives(u64),
+   |     ^^^^^^^^^^
+
+warning: `language-guesser` (bin "language-guesser") generated 14 warnings
+    Finished dev [unoptimized + debuginfo] target(s) in 0.05s
+     Running `target/debug/language-guesser -p test`
+hi
+hi
+hi
+hi
+hi
+hi
+hi
+hi
+hi
+hi

@@ -1,9 +1,10 @@
-use crate::{util::DeserializeKeys, Code, CodeProvider};
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use octocrab::Octocrab;
 use rand::{prelude::*, thread_rng};
 use serde::Deserialize;
+
+use crate::{util::DeserializeKeys, Code, CodeProvider};
 
 #[derive(Deserialize, Debug)]
 struct CodeRequest {

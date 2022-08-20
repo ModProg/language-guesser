@@ -1,27 +1,21 @@
-use anathema::display::disable_raw_mode;
-use anathema::runtime::Event;
-use anathema::runtime::Runtime;
-use anathema::templates::DataCtx;
+use std::{env, num::NonZeroU8, sync::Arc, thread, time::Duration};
+
+use anathema::{
+    runtime::{
+        Event::{self, User},
+        Runtime,
+    },
+    templates::DataCtx,
+};
 use anyhow::{bail, Result};
 use async_trait::async_trait;
-use clap::ArgEnum;
-use clap::Parser;
+use clap::{ArgEnum, Parser};
 use crossterm::event::KeyCode;
-use crossterm::execute;
-use futures::select;
-use futures::FutureExt;
+use futures::{select, FutureExt};
 use rand::prelude::*;
-use std::io::stdout;
-use std::num::NonZeroU8;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::Relaxed;
-use std::sync::Arc;
-use std::thread;
-use std::time::{Duration, Instant};
-use std::{env, io};
+use tokio::time::MissedTickBehavior;
 
-use crate::providers::github::GitHub;
-use crate::providers::TestProvider;
+use crate::providers::{github::GitHub, TestProvider};
 
 mod providers;
 mod util;
@@ -119,168 +113,9 @@ async fn main() -> Result<()> {
     code_provider.options(options.options.into());
     let code_provider = Arc::new(code_provider);
 
-    // // Create Terminal
-    // let (points, codes) = {
-    //     enable_raw_mode()?;
-    //     let mut stdout = io::stdout();
-    //     let backend = CrosstermBackend::new(stdout);
-    //     let mut terminal = Terminal::new(backend)?;
-    //     terminal.clear()?;
-    //
-    //     let rng = &mut rand::thread_rng();
-    //
-    //     let mut points_total = 0;
-    //     let mut codes: Vec<(Code, Option<i32>)> = Vec::new();
-    //     let mut lives = 5;
-    //     let c = code_provider.clone();
-    //     let mut next = Box::pin(tokio::spawn(async move { c.get_code().await }));
-    //     'main: loop {
-    //         if lives == 0 {
-    //             break 'main;
-    //         }
-    //         let code = next.await??;
-    //         let c = code_provider.clone();
-    //         next = Box::pin(tokio::spawn(async move { c.get_code().await }));
-    //         let language_descriptions = code
-    //             .options
-    //             .clone()
-    //             .into_iter()
-    //             .zip(1..)
-    //             .collect::<Vec<_>>();
-    //         let mut points_round = MAX_POINTS;
-    //         let origin = loop {
-    //             let origin = rng.gen_range(0..code.code.len());
-    //             if !code.code.chars().nth(origin).unwrap().is_whitespace() {
-    //                 break origin as i32;
-    //             };
-    //         };
-    //         let text = code.code.clone();
-    //         let mut last = Instant::now();
-    //         'tick: loop {
-    //             if Instant::now().duration_since(last) > STEP_DURATION {
-    //                 if points_round == 0 {
-    //                     lives -= 1;
-    //                     if lives == 0 {
-    //                         break 'main;
-    //                     } else {
-    //                         break 'tick;
-    //                     }
-    //                 } else {
-    //                     points_round -= 1;
-    //                 }
-    //                 last = Instant::now();
-    //             }
-    //             terminal.draw(|f| {
-    //                 let vertical = Layout::default()
-    //                     .direction(Direction::Vertical)
-    //                     .constraints([Constraint::Length(6), Constraint::Percentage(80)].as_ref())
-    //                     .split(f.size());
-    //                 let block = Block::default().borders(Borders::ALL);
-    //                 {
-    //                     let inner = Layout::default()
-    //                         .direction(Direction::Vertical)
-    //                         .constraints(
-    //                             [
-    //                                 Constraint::Length(2),
-    //                                 Constraint::Length(1),
-    //                                 Constraint::Percentage(100),
-    //                             ]
-    //                             .as_ref(),
-    //                         )
-    //                         .split(block.inner(vertical[0]));
-    //                     let paragraph = Paragraph::new(
-    //                         "Press CTRL+C if you want to give up.\nPress 1-4 to guess a language.",
-    //                     );
-    //                     f.render_widget(paragraph, inner[0]);
-    //                     let bottom = Layout::default()
-    //                         .direction(Direction::Horizontal)
-    //                         .constraints(
-    //                             [
-    //                                 Constraint::Ratio(1, 3),
-    //                                 Constraint::Ratio(1, 3),
-    //                                 Constraint::Ratio(1, 3),
-    //                             ]
-    //                             .as_ref(),
-    //                         )
-    //                         .split(inner[2]);
-    //                     let p = Paragraph::new(format!("Total Points: {}", points_total));
-    //                     f.render_widget(p, bottom[0]);
-    //
-    //                     let p = Paragraph::new(format!("Round Points: {}", points_round));
-    //                     f.render_widget(p, bottom[1]);
-    //
-    //                     let p = Paragraph::new(format!("Lives: {}", "🫀".repeat(lives)));
-    //                     f.render_widget(p, bottom[2]);
-    //                 }
-    //                 f.render_widget(block, vertical[0]);
-    //
-    //                 let horizontal = Layout::default()
-    //                     .direction(Direction::Horizontal)
-    //                     .constraints([Constraint::Length(20), Constraint::Min(0)])
-    //                     .split(vertical[1]);
-    //                 let shown_chars = if points_round == 0 {
-    //                     text.len() as i32
-    //                 } else {
-    //                     shown_chars(points_round)
-    //                 };
-    //                 let start = (text.len() as i32 - shown_chars)
-    //                     .min(origin as i32 - shown_chars / 2)
-    //                     .max(0);
-    //                 let code = Paragraph::new(
-    //                     text.as_str()
-    //                         .chars()
-    //                         .skip(start as usize)
-    //                         .take(shown_chars as usize)
-    //                         .collect::<String>(),
-    //                 )
-    //                 .wrap(Wrap { trim: false })
-    //                 .block(Block::default().title("Code").borders(Borders::ALL));
-    //
-    //                 f.render_widget(code, horizontal[1]);
-    //                 let table =
-    //                     Table::new(language_descriptions.iter().map(|(language, number)| {
-    //                         Row::new(vec![number.to_string(), language.to_string()])
-    //                     }))
-    //                     .widths(&[Constraint::Length(3), Constraint::Percentage(100)])
-    //                     .block(Block::default().title("Languages").borders(Borders::ALL));
-    //                 f.render_widget(table, horizontal[0]);
-    //             })?;
-    //
-    //             if event::poll(Duration::ZERO)? {
-    //                 if let Event::Key(KeyEvent {
-    //                     code: key,
-    //                     modifiers,
-    //                 }) = event::read()?
-    //                 {
-    //                     if let (Key::Char('c'), KeyModifiers::CONTROL) = (key, modifiers) {
-    //                         break 'main;
-    //                     }
-    //                     if let Key::Char('q') = key {
-    //                         break 'main;
-    //                     }
-    //                     if let Key::Char(char) = key {
-    //                         if ('1'..='9').contains(&char) {
-    //                             if char as usize - '1' as usize == code.language {
-    //                                 points_total += points_round;
-    //                                 codes.push((code, Some(points_round)));
-    //                             } else {
-    //                                 lives -= 1;
-    //                                 codes.push((code, None));
-    //                             }
-    //                             break 'tick;
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     disable_raw_mode()?;
-    //     (points_total, codes)
-    // };
-    //
     const TEMPLATE: &str = include_str!("ui.tiny");
     let mut runtime = Runtime::<UserEvent>::new();
-    // runtime.output_cfg.alt_screen = true;
+    runtime.output_cfg.alt_screen = true;
     let runtime_sender = runtime.sender();
     let (tx, rx) = flume::unbounded::<InputEvent>();
 
@@ -321,26 +156,74 @@ async fn main() -> Result<()> {
 
     let mut event = rx.recv_async().fuse();
     let mut code_req = code_provider.get_code().fuse();
+    let mut tick = tokio::time::interval(STEP_DURATION);
+    tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    // let mut tick = tick..fuse();
 
+    // TODO preload code
     let mut current_code: Option<Code> = None;
+    let mut origin = 0usize;
+
+    fn code_section(code: &str, origin: usize, points: i64) -> String {
+        let shown_chars = if points == 0 {
+            code.len()
+        } else {
+            shown_chars(points).min(code.len())
+        };
+        let start = (code.len() - shown_chars).min(origin.saturating_sub(shown_chars / 2));
+        code.chars()
+            .skip(start as usize)
+            .take(shown_chars as usize)
+            .collect()
+    }
 
     loop {
         select! {
+            _ = tick.tick().fuse() => {
+                if let Some(code) = &current_code {
+                    if points_round == 0 {
+                        code_req = code_provider.get_code().fuse();
+                        points_round = MAX_POINTS;
+                        runtime_sender.send(User(UserEvent::Code("".to_string())))?;
+                        runtime_sender.send(User(UserEvent::RoundPoints(points_round)))?;
+                        codes.push((current_code.take().expect("There is a code"), None));
+                        if lives == 1 {
+                            break
+                        } else{
+                            lives -=1;
+                            runtime_sender.send(User(UserEvent::Lives(lives)))?;
+                        }
+                    } else {
+                        points_round -= 1;
+                        runtime_sender.send(User(UserEvent::Code(code_section(&code.code, origin, points_round))))?;
+                        runtime_sender.send(User(UserEvent::RoundPoints(points_round)))?;
+                    }
+                }
+            },
             event_ = event => {
                 match event_? {
                     InputEvent::Guess(language) => {
                         if let Some(code) =current_code.take() {
                             if code.language == language {
                                 points_total += points_round;
+                                points_round = MAX_POINTS;
                                 runtime_sender.send(Event::User(UserEvent::TotalPoints(points_total)))?;
                                 codes.push((code, Some(points_total)))
                             } else {
+                                points_round = MAX_POINTS;
                                 codes.push((code, None));
+                                if lives == 1 {
+                                    break
+                                } else{
+                                    lives -=1;
+                                    runtime_sender.send(User(UserEvent::Lives(lives)))?;
+                                }
                             }
 
                             code_req = code_provider.get_code().fuse();
 
                             runtime_sender.send(Event::User(UserEvent::RoundPoints(points_round)))?;
+                            runtime_sender.send(Event::User(UserEvent::Code("".to_string())))?;
                         }
                     },
                     InputEvent::Quit => break,
@@ -348,9 +231,16 @@ async fn main() -> Result<()> {
                 event = rx.recv_async().fuse();
             },
             code_ = code_req => {
+                tick.reset();
                 let code = code_?;
-                runtime_sender.send(Event::User(UserEvent::Code(code.code.clone())))?;
                 runtime_sender.send(Event::User(UserEvent::Languages(code.options.iter().cloned().enumerate().map(|(i,l)|(i as u64, l)).collect())))?;
+                origin = loop {
+                    let origin = thread_rng().gen_range(0..code.code.len());
+                    if !code.code.chars().nth(origin).unwrap().is_whitespace() {
+                        break origin;
+                    };
+                };
+                runtime_sender.send(User(UserEvent::Code(code_section(&code.code, origin, points_round))))?;
                 current_code = Some(code);
             }
         };
@@ -358,9 +248,10 @@ async fn main() -> Result<()> {
     ui.join().expect("UI thread exits successfully");
     println!("\nYour total points {}!\n\nDetails:", points_total);
     {
-        use comfy_table::modifiers::UTF8_SOLID_INNER_BORDERS;
-        use comfy_table::presets::UTF8_FULL;
-        use comfy_table::{Cell, CellAlignment, ContentArrangement, Table};
+        use comfy_table::{
+            modifiers::UTF8_SOLID_INNER_BORDERS, presets::UTF8_FULL, Cell, CellAlignment,
+            ContentArrangement, Table,
+        };
         let mut table = Table::new();
         table
             .load_preset(UTF8_FULL)

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 
 use crate::{Code, CodeProvider};
 
@@ -14,11 +14,11 @@ pub struct TestProvider {
 #[async_trait]
 impl CodeProvider for TestProvider {
     async fn get_code(&self) -> Result<Code> {
-        // let c: char = Alphanumeric;
+        let c: char = thread_rng().gen_range('a'..'d');
         Ok(Code {
             reference: "test".into(),
-            code: "ABC".into(),
-            language: 0,
+            code: c.to_string().repeat(20),
+            language: c as usize - 'a' as usize,
             options: vec!["a", "b", "c", "d"]
                 .into_iter()
                 .take(self.options)
