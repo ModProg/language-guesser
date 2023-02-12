@@ -1,6 +1,6 @@
 # LanguageGuesser
 
-**Winner of the [Terminal Jam](https://togglebit.io/posts/terminal-game-jam/) by [Togglebit](twitch.tv/togglebit).**
+**Winner of the [Terminal Jam](https://web.archive.org/web/20220926232152/https://togglebit.io/posts/terminal-game-jam/) by [Togglebit](twitch.tv/togglebit).**
 
 The goal is simple: **Guess the programming language shown**.
 
